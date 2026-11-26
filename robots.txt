@@ -26,4 +26,4 @@ Allow: /
 User-agent: Bingbot
 Allow: /
 
-Sitemap: https://www.nishantsharma.co.uk/sitemap.xml
+Sitemap: https://nishantsharma.co.uk/sitemap.xml
