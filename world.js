@@ -5,6 +5,14 @@ import * as THREE from './vendor/three.module.min.js';
 const D = document, W = window;
 const RM = W.matchMedia && W.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const MOBILE = W.innerWidth < 760;
+/* Build the 3D scene only after the opening sequence hands over, so the first paint is not competing for the main thread. */
+await new Promise(res => {
+  const H = D.documentElement;
+  if (H.classList.contains('ready') || !D.getElementById('pre')) return res();
+  const mo = new MutationObserver(() => { if (H.classList.contains('ready')) { mo.disconnect(); setTimeout(res, 60); } });
+  mo.observe(H, { attributes: true, attributeFilter: ['class'] });
+  setTimeout(res, 6000);
+});
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const sstep = t => t * t * (3 - 2 * t);
 
@@ -61,7 +69,7 @@ const camera = new THREE.PerspectiveCamera(46, 1, .5, 2400);
 scene.fog = new THREE.FogExp2(0x5e5478, .0065);
 
 /* terrain */
-const SIZE = 760, SEG = MOBILE ? 170 : 300;
+const SIZE = 760, SEG = MOBILE ? 120 : 260;
 const tg = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); tg.rotateX(-Math.PI / 2);
 const pos = tg.attributes.position;
 for (let i = 0; i < pos.count; i++) pos.setY(i, height(pos.getX(i), pos.getZ(i)));
@@ -124,20 +132,20 @@ for (let i = 0; i < NC; i++) {
 
 /* stars */
 const sg = new THREE.BufferGeometry(), sv = [];
-for (let i = 0; i < 2200; i++) { const u = Math.random() * 2 - 1, th = Math.random() * 6.283; const y = Math.abs(u) * .9 + .05, r = Math.sqrt(1 - y * y); sv.push(Math.cos(th) * r * 1400, y * 1400, Math.sin(th) * r * 1400); }
+for (let i = 0; i < (MOBILE ? 1200 : 2200); i++) { const u = Math.random() * 2 - 1, th = Math.random() * 6.283; const y = Math.abs(u) * .9 + .05, r = Math.sqrt(1 - y * y); sv.push(Math.cos(th) * r * 1400, y * 1400, Math.sin(th) * r * 1400); }
 sg.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
 const starMat = new THREE.PointsMaterial({ color: 0xf5ede1, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false });
 scene.add(new THREE.Points(sg, starMat));
 
 /* rain around the camera */
-const NR = MOBILE ? 500 : 1200, rg = new THREE.BufferGeometry(), rv = new Float32Array(NR * 6);
+const NR = MOBILE ? 260 : 1000, rg = new THREE.BufferGeometry(), rv = new Float32Array(NR * 6);
 for (let i = 0; i < NR; i++) { const x = (Math.random() - .5) * 60, y = Math.random() * 40 - 20, z = (Math.random() - .5) * 60; rv.set([x, y, z, x + .15, y - 1.6, z], i * 6); }
 rg.setAttribute('position', new THREE.BufferAttribute(rv, 3));
 const rainMat = new THREE.LineBasicMaterial({ color: 0xc8c0d0, transparent: true, opacity: 0, fog: false, depthWrite: false });
 const rain = new THREE.LineSegments(rg, rainMat); scene.add(rain);
 
 /* embers around the camera */
-const NE = 420, eg = new THREE.BufferGeometry(), ev = new Float32Array(NE * 3), es = new Float32Array(NE);
+const NE = MOBILE ? 200 : 420, eg = new THREE.BufferGeometry(), ev = new Float32Array(NE * 3), es = new Float32Array(NE);
 for (let i = 0; i < NE; i++) { ev.set([(Math.random() - .5) * 70, Math.random() * 40 - 20, (Math.random() - .5) * 70], i * 3); es[i] = Math.random(); }
 eg.setAttribute('position', new THREE.BufferAttribute(ev, 3));
 const embMat = new THREE.PointsMaterial({ color: 0xff9a40, size: 3, sizeAttenuation: false, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
@@ -182,8 +190,10 @@ W.addEventListener('pointermove', e => { mouse.set(e.clientX / W.innerWidth * 2 
 function resize() { const w = W.innerWidth, h = W.innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w < h ? 62 : 46; camera.updateProjectionMatrix(); measure(); }
 W.addEventListener('resize', resize);
 const tp = new THREE.Vector3(), tl = new THREE.Vector3(), right = new THREE.Vector3(), tc = new THREE.Color();
-let last = performance.now(), first = true, visible = true;
+let last = performance.now(), first = true, visible = true, lastDraw = 0, lastMove = performance.now();
 D.addEventListener('visibilitychange', () => { visible = !D.hidden; });
+W.addEventListener('scroll', () => { lastMove = performance.now(); }, { passive: true });
+W.addEventListener('pointermove', () => { lastMove = performance.now(); }, { passive: true });
 function lerpPreset(out, a, b, t, k) {
   ['top', 'hor', 'fog', 'sun', 'cloud', 'terr'].forEach(n => { tc.copy(a[n]).lerp(b[n], t); out[n].lerp(tc, k); });
   ['el', 'dens', 'stars', 'rain', 'emb'].forEach(n => { out[n] += ((a[n] + (b[n] - a[n]) * t) - out[n]) * k; });
@@ -198,7 +208,11 @@ function adapt(dtRaw) {           // step quality down on slow devices
 function frame(now) {
   requestAnimationFrame(frame);
   if (!visible) return;
-  const dtRaw = (now - last) / 1000; adapt(dtRaw);
+  /* 30 fps on phones, and on any device once scrolling stops */
+  const minDt = (MOBILE || now - lastMove > 2500) ? 32 : 0;
+  if (now - lastDraw < minDt) return;
+  lastDraw = now;
+  const dtRaw = (now - last) / 1000; adapt(minDt ? dtRaw * .6 : dtRaw);
   const dt = Math.min(.05, dtRaw); last = now;
   scrollY = W.pageYOffset;
   const s = sample();
@@ -243,7 +257,7 @@ const gc = D.getElementById('globe');
 if (gc) {
   let gr; try { gr = new THREE.WebGLRenderer({ canvas: gc, alpha: true, antialias: true }); } catch (e) { gr = null; }
   if (gr) {
-    gr.setPixelRatio(Math.min(W.devicePixelRatio || 1, 2)); gr.outputColorSpace = THREE.SRGBColorSpace;
+    gr.setPixelRatio(Math.min(W.devicePixelRatio || 1, MOBILE ? 1.5 : 2)); gr.outputColorSpace = THREE.SRGBColorSpace;
     const gs = new THREE.Scene(), gcam = new THREE.PerspectiveCamera(32, 1, .1, 50); gcam.position.set(0, 0, 4.1);
     const world = new THREE.Group(); world.rotation.order = 'XYZ'; gs.add(world);
     const V = (la, lo, r = 1) => { la *= Math.PI / 180; lo *= Math.PI / 180; return new THREE.Vector3(Math.cos(la) * Math.sin(lo) * r, Math.sin(la) * r, Math.cos(la) * Math.cos(lo) * r); };

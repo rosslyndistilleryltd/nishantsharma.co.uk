@@ -12,7 +12,7 @@ var ss=(function(){try{return W.sessionStorage}catch(e){return null}})();
 /* ---------- split headings into words > chars (Mont-Fort SplitText) ---------- */
 var SPLIT='.statement,.partcard h2,.ch h3,.venture h3,.close-quote blockquote,.nextp .nt,.card b,.mark .sub';
 $$(SPLIT).forEach(function(el){
-  if(el.dataset.split)return;el.dataset.split='1';el.setAttribute('aria-label',el.textContent.replace(/\s+/g,' ').trim());
+  if(el.dataset.split)return;el.dataset.split='1';var _txt=el.textContent.replace(/\s+/g,' ').trim();if(/^(H[1-6]|BLOCKQUOTE|A)$/.test(el.tagName))el.setAttribute('aria-label',_txt);else{var _sr=D.createElement('span');_sr.className='sr-only';_sr.textContent=_txt;el.appendChild(_sr);}
   (function walk(node){
     Array.prototype.slice.call(node.childNodes).forEach(function(n){
       if(n.nodeType===3){
@@ -95,7 +95,7 @@ if(pre){
   else{
     var yr=$('.yr',pre),bar=$('.bar i',pre),pl=$('.pl',pre);
     var places=['Dibrugarh','Jalandhar','Amritsar','Glasgow','Edinburgh'];
-    var t0=performance.now(),dur=seen?1200:2300,loaded=false; /* plays on every page load; a shorter version once already seen this session */
+    var t0=performance.now(),dur=seen?1000:(vw<760?1600:2300),loaded=false; /* plays on every page load; a shorter version once already seen this session */
     var fontsP=(D.fonts&&D.fonts.ready)?D.fonts.ready:Promise.resolve();
     Promise.race([fontsP,new Promise(function(r){setTimeout(r,3000)})]).then(function(){loaded=true});
     (function tick(now){
@@ -402,9 +402,13 @@ $$('img').forEach(function(im){if(!im.complete)im.addEventListener('load',functi
 
 /* ---------- main loop ---------- */
 var lastY=-1,lastDir=0,yAcc=0,lastYear=null;
+var lastFull=0,lastWave=0;
 function frame(t){
   if(lenis&&!GS)lenis.raf(t);
   var y=W.pageYOffset||H.scrollTop,mid=y+vh*.5;
+  /* idle: when the page is not moving, skip layout reads/writes (refresh every 500ms as a safety net) */
+  if(y===lastY&&t-lastFull<500){if(t-lastWave>33){drawWave(t);lastWave=t}requestAnimationFrame(frame);return}
+  lastFull=t;
   // header
   if(hdr){hdr.classList.toggle('solid',y>60);
     if(y!==lastY){var dir=y>lastY?1:-1;if(dir!==lastDir){yAcc=0;lastDir=dir}yAcc+=Math.abs(y-lastY);
@@ -429,7 +433,7 @@ function frame(t){
   if(fpath&&M.flight){var fp=clamp((mid-M.flight.t+vh*.15)/(M.flight.h+vh*.1),0,1);if(RM)fp=1;if(!isFinite(fp)||!isFinite(flen))fp=0;fpath.style.strokeDashoffset=flen*(1-fp);
     var pt=fpath.getPointAtLength(flen*fp),pt2=fpath.getPointAtLength(Math.min(flen,flen*fp+1));fplane.setAttribute('transform','translate('+pt.x+','+pt.y+') rotate('+(Math.atan2(pt2.y-pt.y,pt2.x-pt.x)*180/Math.PI)+')')}
   lastY=y;
-  drawWave(t);
+  if(t-lastWave>16){drawWave(t);lastWave=t}
   requestAnimationFrame(frame);
 }
 route(location.hash,true);
