@@ -36,10 +36,12 @@ $$('.mark h1 .l').forEach(function(l,i){l.style.setProperty('--i',i)});
 var lenis=null;
 var GS=W.gsap&&W.ScrollTrigger;
 if(GS){gsap.registerPlugin(ScrollTrigger);H.classList.add('gs')}else H.classList.add('nogs');
-if(!RM&&W.Lenis){
+function initLenis(){
+  if(RM||!W.Lenis||lenis)return;
   try{lenis=new W.Lenis({duration:1.35,easing:function(t){return Math.min(1,1.001-Math.pow(2,-10*t))},smoothWheel:true,wheelMultiplier:.85,touchMultiplier:1.4})}catch(e){lenis=null}
   if(lenis&&GS){lenis.on('scroll',ScrollTrigger.update);gsap.ticker.add(function(t){lenis.raf(t*1000)});gsap.ticker.lagSmoothing(0)}
 }
+initLenis();
 /* ---------- router: teaser + tabbed panels ---------- */
 var panels=$$('.panel'),curP=$('.panel.on'),curtain=$('.curtain'),busy=false,pendingPanel=null,baseTitle=D.title;
 function panelOf(el){return el&&(el.classList&&el.classList.contains('panel')?el:el.closest&&el.closest('.panel'))}
@@ -324,31 +326,32 @@ if(lb){$('.lb-x',lb).addEventListener('click',lbClose);$('.lb-p',lb).addEventLis
   D.addEventListener('keydown',function(e){if(lb.hidden)return;if(e.key==='Escape')lbClose();if(e.key==='ArrowLeft')lbShow(lbIx-1);if(e.key==='ArrowRight')lbShow(lbIx+1)})}
 
 /* ---------- Mont-Fort motion: scrubbed char reveal, rise-in, zoom-out images, parallax ---------- */
-function setupMotion(){
+function setupMotion(late){
   if(!GS||RM){$$('.rv,.split,.dia,.edge,.structure').forEach(function(el){el.classList.add('in')});return}
+  /* Work is queued in small slices so start-up never blocks the main thread for long. */
+  var Q=[];function run(){var t=performance.now();while(Q.length&&performance.now()-t<12)Q.shift()();if(Q.length)setTimeout(run,0);else ScrollTrigger.refresh()}
+  Q.push(function(){gsap.set('.rv:not(.in)',{opacity:0,y:20});if(late){H.classList.remove('nogs');H.classList.add('gs')}});
+  Q.push(function(){gsap.set('.plate.art img',{clipPath:'inset(100% 0% 0% 0%)'})});
   // headings write themselves in, letter by letter, scrubbed to the scroll
-  $$(SPLIT).forEach(function(el){
+  $$(SPLIT).forEach(function(el){Q.push(function(){
     var cs=$$('.c',el);if(!cs.length)return;
-    var inHero=el.closest('.hero');
-    if(inHero){gsap.fromTo(cs,{opacity:0},{opacity:1,duration:.9,ease:'none',stagger:.035,delay:2.6});return}
+    if(el.closest('.hero')){if(late)return;gsap.fromTo(cs,{opacity:0},{opacity:1,duration:.9,ease:'none',stagger:.035,delay:2.6});return}
     gsap.fromTo(cs,{opacity:.06},{opacity:1,ease:'none',stagger:.1,scrollTrigger:{trigger:el,start:'top 92%',end:'top 42%',scrub:1}});
-  });
+  })});
   // body copy rises 20px and fades (power2.out, stagger .15)
-  ScrollTrigger.batch('.rv',{start:'top 92%',once:true,onEnter:function(b){gsap.fromTo(b,{y:20,opacity:0},{y:0,opacity:1,duration:1.6,ease:'power2.out',stagger:.15,overwrite:true})}});
-  gsap.set('.rv',{opacity:0,y:20});
+  Q.push(function(){ScrollTrigger.batch('.rv:not(.in)',{start:'top 92%',once:true,onEnter:function(b){gsap.fromTo(b,{y:20,opacity:0},{y:0,opacity:1,duration:1.6,ease:'power2.out',stagger:.15,overwrite:true})}})});
   // images settle from 110% (Mont-Fort "zoomOut")
-  ScrollTrigger.batch('.plate:not(.art) img,figure.sec img,.crestbig,.mgrid .ph img,.vimg img,.rx-illus img,.rx-slide-img img,.placestrip .ph img',{start:'top 95%',once:true,onEnter:function(b){gsap.fromTo(b,{scale:1.1,opacity:0},{scale:1,opacity:1,duration:1.8,ease:'expo.out',stagger:.12})}});
+  Q.push(function(){ScrollTrigger.batch('.plate:not(.art) img,figure.sec img,.crestbig,.mgrid .ph img,.vimg img,.rx-illus img,.rx-slide-img img,.placestrip .ph img',{start:'top 95%',once:true,onEnter:function(b){gsap.fromTo(b,{scale:1.1,opacity:0},{scale:1,opacity:1,duration:1.8,ease:'expo.out',stagger:.12})}})});
   // rules draw in
-  ScrollTrigger.batch('.ledger,.stats,.prin,.arms,.press ul,.honours,.videos,.cards,.tally,.parallel',{start:'top 90%',once:true,onEnter:function(b){b.forEach(function(x){x.classList.add('drawn')})}});
+  Q.push(function(){ScrollTrigger.batch('.ledger,.stats,.prin,.arms,.press ul,.honours,.videos,.cards,.tally,.parallel',{start:'top 90%',once:true,onEnter:function(b){b.forEach(function(x){x.classList.add('drawn')})}})});
   // gentle parallax on blocks (yPercent 5 -> -5)
-  $$('.nextp img,.ch-img figure').forEach(function(el){gsap.fromTo(el,{yPercent:5},{yPercent:-5,ease:'none',scrollTrigger:{trigger:el,start:'top bottom',end:'bottom top',scrub:true}})});
-  $$('.dia,.edge,.structure').forEach(function(el){ScrollTrigger.create({trigger:el,start:'top 90%',once:true,onEnter:function(){el.classList.add('in')}})});
+  $$('.nextp img,.ch-img figure').forEach(function(el){Q.push(function(){gsap.fromTo(el,{yPercent:5},{yPercent:-5,ease:'none',scrollTrigger:{trigger:el,start:'top bottom',end:'bottom top',scrub:true}})})});
+  $$('.dia,.edge,.structure').forEach(function(el){Q.push(function(){ScrollTrigger.create({trigger:el,start:'top 90%',once:true,onEnter:function(){el.classList.add('in')}})})});
   // illustrations: curtain reveal, image stays whole
-  ScrollTrigger.batch('.plate.art img',{start:'top 88%',once:true,onEnter:function(b){gsap.fromTo(b,{clipPath:'inset(100% 0% 0% 0%)'},{clipPath:'inset(0% 0% 0% 0%)',duration:1.7,ease:'expo.out',stagger:.15})}});
-  gsap.set('.plate.art img',{clipPath:'inset(100% 0% 0% 0%)'});
+  Q.push(function(){ScrollTrigger.batch('.plate.art img',{start:'top 88%',once:true,onEnter:function(b){gsap.fromTo(b,{clipPath:'inset(100% 0% 0% 0%)'},{clipPath:'inset(0% 0% 0% 0%)',duration:1.7,ease:'expo.out',stagger:.15})}})});
   // album collage drifts in
-  gsap.fromTo('.collage img',{y:60,opacity:0},{y:0,opacity:1,duration:1.6,ease:'power3.out',stagger:.15,scrollTrigger:{trigger:'.collage',start:'top 85%',once:true}});
-  ScrollTrigger.refresh();
+  Q.push(function(){if($('.collage'))gsap.fromTo('.collage img',{y:60,opacity:0},{y:0,opacity:1,duration:1.6,ease:'power3.out',stagger:.15,scrollTrigger:{trigger:'.collage',start:'top 85%',once:true}})});
+  setTimeout(run,0);
 }
 
 /* ---------- V29.4: illustration tilt + glare ---------- */
@@ -437,12 +440,26 @@ function frame(t){
   requestAnimationFrame(frame);
 }
 route(location.hash,true);
-setupMotion();
+/* Smooth scroll and scroll-scrubbed motion load on the first interaction; until then the page uses native scroll and CSS reveals. */
+if(GS)setupMotion();
+else if(!RM){
+  var MEV=['scroll','wheel','pointerdown','touchstart','keydown'],mgo=false;
+  var upgrade=function(){
+    if(mgo)return;mgo=true;MEV.forEach(function(e){W.removeEventListener(e,upgrade,true)});
+    var srcs=['vendor/lenis.min.js','vendor/gsap.min.js','vendor/ScrollTrigger.min.js'],left=srcs.length;
+    srcs.forEach(function(u){var sc=D.createElement('script');sc.src=u;sc.async=false;sc.onload=function(){if(--left)return;
+      if(!(W.gsap&&W.ScrollTrigger))return;GS=true;gsap.registerPlugin(ScrollTrigger);
+      initLenis();setupMotion(true)};D.body.appendChild(sc)});
+  };
+  MEV.forEach(function(e){W.addEventListener(e,upgrade,{passive:true,capture:true})});
+}else setupMotion();
 (function(){var id=alias(location.hash);if(!id||id==='home')return;var el=D.getElementById(id);if(!el||el.classList.contains('panel'))return;
   var n=0;function settle(){measure();if(lenis){lenis.scrollTo(el,{immediate:true,force:true})}else el.scrollIntoView();if(++n<3)setTimeout(settle,700)}
   if(D.readyState==='complete')setTimeout(settle,300);else W.addEventListener('load',function(){setTimeout(settle,300)},{once:true});
   W.addEventListener('wheel',function(){n=9},{once:true,passive:true});W.addEventListener('touchstart',function(){n=9},{once:true,passive:true})})();
-requestAnimationFrame(frame);
+/* the scroll loop starts once the opening sequence hands over */
+if(H.classList.contains('ready')||!pre)requestAnimationFrame(frame);
+else{var mo=new MutationObserver(function(){if(H.classList.contains('ready')){mo.disconnect();requestAnimationFrame(frame)}});mo.observe(H,{attributes:true,attributeFilter:['class']})}
 D.addEventListener('visibilitychange',function(){if(!audio)return;if(D.hidden){audio.request++;clearTimeout(audio.pauseTimer);audio.track.pause();audio.out.gain.cancelScheduledValues(audio.ac.currentTime);audio.out.gain.value=0;audio.ac.suspend().catch(function(){})}else if(soundOn){playScore()}});
 var yEl=$('#yr');if(yEl)yEl.textContent=new Date().getFullYear();
 })();
@@ -460,4 +477,15 @@ var yEl=$('#yr');if(yEl)yEl.textContent=new Date().getFullYear();
   window.addEventListener('hashchange',function(){setTimeout(upd,400);});
   window.addEventListener('load',upd);
   setInterval(upd,1500);
+})();
+
+/* ---------- 3D world: loaded on the visitor's first interaction, so the first paint stays light ---------- */
+(function(){
+  var EV=['scroll','wheel','pointerdown','pointermove','touchstart','keydown'],go=false;
+  function start(){
+    if(go)return;go=true;
+    EV.forEach(function(e){window.removeEventListener(e,start,true)});
+    var s=document.createElement('script');s.type='module';s.src='world.js?v=20261126d';document.body.appendChild(s);
+  }
+  EV.forEach(function(e){window.addEventListener(e,start,{passive:true,capture:true})});
 })();

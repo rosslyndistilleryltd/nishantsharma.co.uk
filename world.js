@@ -72,11 +72,18 @@ scene.fog = new THREE.FogExp2(0x5e5478, .0065);
 const SIZE = 760, SEG = MOBILE ? 120 : 260;
 const tg = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); tg.rotateX(-Math.PI / 2);
 const pos = tg.attributes.position;
-for (let i = 0; i < pos.count; i++) pos.setY(i, height(pos.getX(i), pos.getZ(i)));
+/* Build the terrain in slices so no single task blocks the main thread for long. */
+const yieldNow = () => new Promise(r => (W.scheduler && W.scheduler.yield) ? W.scheduler.yield().then(r) : setTimeout(r, 0));
+let tSlice = performance.now();
+const slice = async i => { if ((i & 255) === 0 && performance.now() - tSlice > 8) { await yieldNow(); tSlice = performance.now(); } };
+for (let i = 0; i < pos.count; i++) { pos.setY(i, height(pos.getX(i), pos.getZ(i))); await slice(i); }
+await yieldNow();
 tg.computeVertexNormals();
 const nor = tg.attributes.normal, col = new Float32Array(pos.count * 3);
 const cLow = C('#2a0c10'), cMid = C('#6e4448'), cHigh = C('#efe4d4'), tmp = new THREE.Color();
+await yieldNow(); tSlice = performance.now();
 for (let i = 0; i < pos.count; i++) {
+  await slice(i);
   const y = pos.getY(i), ny = nor.getY(i);
   const t1 = clamp((y + 10) / 45, 0, 1), t2 = clamp((y - 30) / 30, 0, 1) * clamp((ny - .35) / .35, 0, 1);
   tmp.copy(cLow).lerp(cMid, t1).lerp(cHigh, t2 * .95);
