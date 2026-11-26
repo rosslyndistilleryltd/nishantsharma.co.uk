@@ -489,3 +489,25 @@ var yEl=$('#yr');if(yEl)yEl.textContent=new Date().getFullYear();
   }
   EV.forEach(function(e){window.addEventListener(e,start,{passive:true,capture:true})});
 })();
+
+/* ---------- contact form ---------- */
+(function(){
+  var f=document.getElementById('cform'),b=document.querySelector('.cf-open');if(!f||!b)return;
+  var st=f.querySelector('.cf-status'),sub=f.querySelector('button[type=submit]');
+  b.addEventListener('click',function(){var open=f.hidden;f.hidden=!open;b.setAttribute('aria-expanded',String(open));if(open){var n=f.querySelector('input[name=name]');n&&n.focus()}});
+  function say(m,err){st.textContent=m;st.classList.toggle('err',!!err)}
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    var d={name:f.elements.name.value,email:f.elements.email.value,organisation:f.elements.organisation.value,topic:f.elements.topic.value,message:f.elements.message.value,website:f.elements.website.value,consent:f.elements.consent.checked};
+    if(!d.name.trim())return say('Please enter your name.',1);
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email.trim()))return say('Please enter a valid email address.',1);
+    if(d.message.trim().length<10)return say('Please write a short message.',1);
+    if(!d.consent)return say('Please confirm we may use your details to reply.',1);
+    sub.disabled=true;say('Sending…');
+    fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(d)})
+      .then(function(r){return r.json().catch(function(){return{ok:false}})})
+      .then(function(r){if(r&&r.ok){f.reset();say('Thank you. Your message has been sent and Nish will reply by email.')}else say((r&&r.error)||'Your message could not be sent. Please try again in a few minutes.',1)})
+      .catch(function(){say('Your message could not be sent. Please check your connection and try again.',1)})
+      .then(function(){sub.disabled=false});
+  });
+})();

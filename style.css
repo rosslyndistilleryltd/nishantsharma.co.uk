@@ -1094,3 +1094,29 @@ html[data-panel=archive] .hdr{background:rgba(12,10,26,.8)}
 .ftr a,.ftr .talk .go span,.ftr .legal small,.ftr small{opacity:1}
 .ftr .talk .go span a{color:var(--rose-deep)}
 .ftr .wm span small{opacity:1;color:var(--rose-deep)}
+
+/* contact form (footer) */
+.ftr .talk .go{flex-direction:row;flex-wrap:wrap;align-items:center}
+.ftr .talk .go>span{flex-basis:100%;text-align:left}
+button.li{font:inherit;font-size:11px;letter-spacing:.24em;text-transform:uppercase;background:none;cursor:pointer}
+.ftr .talk .li.cf-open{background:var(--rose-deep);color:var(--cream)}
+.ftr .talk .li.cf-open:hover{background:var(--ground)}
+.cform{flex-basis:100%;margin-top:28px;color:var(--warm-black);max-width:880px}
+.cform[hidden]{display:none}
+.cf-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px 24px}
+.cform label{display:flex;flex-direction:column;gap:8px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--rose-deep)}
+.cform label small{text-transform:none;letter-spacing:0;font-size:12px;opacity:.8}
+.cform input,.cform select,.cform textarea{font:inherit;font-size:16px;letter-spacing:0;text-transform:none;color:var(--warm-black);background:rgba(255,255,255,.55);border:1px solid rgba(74,61,99,.35);border-radius:0;padding:12px 14px;min-height:48px;width:100%;box-sizing:border-box}
+.cform input:focus,.cform select:focus,.cform textarea:focus{outline:2px solid var(--rose-deep);outline-offset:1px}
+.cform .cf-msg{margin-top:18px}
+.cform textarea{resize:vertical;min-height:130px}
+.cform .cf-hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.cform .cf-ok{flex-direction:row;align-items:flex-start;gap:12px;margin-top:18px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--warm-black)}
+.cform .cf-ok input{width:22px;height:22px;min-height:0;flex:none;margin:1px 0 0;padding:0}
+.cform .cf-ok a{color:var(--rose-deep);text-decoration:underline}
+.cf-row{display:flex;align-items:center;gap:20px;margin-top:22px;flex-wrap:wrap}
+.cf-status{margin:0;font-size:14px;color:var(--warm-black)}
+.cf-status.err{color:#8a1c1c}
+@media (max-width:760px){.cf-grid{grid-template-columns:1fr}}
+.ftr .cform .cf-ok span,.ftr .cform .cf-ok a{font-size:14px;letter-spacing:0;text-transform:none;opacity:1}
+.ftr .cform label>span{display:block}
