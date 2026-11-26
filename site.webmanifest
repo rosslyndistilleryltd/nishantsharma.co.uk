@@ -1,0 +1,24 @@
+{
+ "name": "Nishant Sharma",
+ "short_name": "Nishant Sharma",
+ "description": "The Dibrugarh Boy: the story and work of Nishant Sharma, Edinburgh.",
+ "start_url": "/",
+ "scope": "/",
+ "display": "standalone",
+ "lang": "en-GB",
+ "background_color": "#1A1530",
+ "theme_color": "#2e0910",
+ "icons": [
+  {
+   "src": "/assets/apple-touch-icon.png",
+   "sizes": "180x180",
+   "type": "image/png"
+  },
+  {
+   "src": "/assets/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any maskable"
+  }
+ ]
+}
